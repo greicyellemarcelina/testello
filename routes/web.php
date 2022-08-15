@@ -14,8 +14,6 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::get('/', function () {
-    return view('welcome');
-});
-
-Route::post('/upload', [PriceTableController::class, 'upload']);
+Route::post('/upload', [PriceTableController::class, 'upload'])->name('prices.upload');
+Route::get('/', [PriceTableController::class, 'list'])->name('prices.list');
+Route::get('/upload', [PriceTableController::class, 'create'])->name('prices.create');

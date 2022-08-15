@@ -1,64 +1,92 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400"></a></p>
+# Testello
+## Como executar a aplicação
+### Requisitos
+ - PHP 8
+ - MySql
+ - Composer
 
-<p align="center">
-<a href="https://travis-ci.org/laravel/framework"><img src="https://travis-ci.org/laravel/framework.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+### Configurando
+Renomear `.env.sample` para `.env`
+É necessário mudar as variaveis abaixo de acordo com o seu ambiente
+ - DB_HOST
+ - DB_PORT
+ - DB_DATABASE
+ - DB_USERNAME
+ - DB_PASSWORD
 
-## About Laravel
+É necessário também executar os seguintes comandos
+```shell
+php artisan migrate
+php artisan db:seed
+```
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+ ### Executando
+ Para executar a aplicação é necessário 2 componentes rodando:
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+ O Job System:
+ ```
+ php artisan queue:work --timeout=600
+ ```
+ 
+ O servidor:
+ ```
+ php artisan serve
+ ```
+ A aplicaçao pode ser acessada por `http://localhost:8000`
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Detalhes da implementaçao
+A aplicaçao tem apenas duas telas, uma para o acompanhamentos do upload das tabelas de preço e outra para o próprio upload.
 
-## Learning Laravel
+Para solucionar a problemática da tabela de preços poder ter um tamanho elevado e ser impossível processar um request de forma adequada, foi decidido a criaçao de um job feito em background, reportando o status do processamento na tela principal.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+Não ficou claro o funcionamento da tabela de preços, sendo assim, assumi que o conjunto de campos que representam a faixa de cep inicial e final junto com a faixa de peso inicial e final não se repetem, e por isso eu não permito a duplicaço desses 4 campos. Caso esse nao for o cenário real, minha abordagem seria outra, provavelmente removendo e reinserindo os dados do cliente em questao.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains over 2000 video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Entendi também que cada tabela de preços está vinculada a um unico cliente, por isso uso o id do mesmo para separaçao dos dados da tabela de preços (no banco de dados). Se esse nao for o caso, deveriamos seguir com outra abordagem, provavelmente uma tela de seleçao manual ou algum tipo de agrupamento.
 
-## Laravel Sponsors
+O foco principal foi na soluçao do processamento do csv, e foi aplicado menor esforço na interface.
+## Detalhes do teste
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the Laravel [Patreon page](https://patreon.com/taylorotwell).
+```
+Testello
 
-### Premium Partners
+Somos uma transportadora e prestamos serviço para N clientes. Cada um possui sua tabela de frete com reajuste periódico.
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Cubet Techno Labs](https://cubettech.com)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[Many](https://www.many.co.uk)**
-- **[Webdock, Fast VPS Hosting](https://www.webdock.io/en)**
-- **[DevSquad](https://devsquad.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[OP.GG](https://op.gg)**
-- **[WebReinvent](https://webreinvent.com/?utm_source=laravel&utm_medium=github&utm_campaign=patreon-sponsors)**
-- **[Lendio](https://lendio.com)**
+Portanto, quando chega a época do reajuste são realizados manualmente a alteração de cada um dos clientes gerando custos para a empresa por alocação de horas de trabalho.
 
-## Contributing
+Precisamos criar uma solução que permita subir um CSV com a respectiva tabela de frete de cada um dos Clientes (1 ou +) de maneira eficiente e que suporte uma grande quantidade de registros (Essas tabelas podem chegar a ter 300mil linhas).
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Como podemos resolver esse problema? De que maneira conseguimos fazer o upload de 1 ou + CSV's sem que o HTTP dê timeout?
 
-## Code of Conduct
+Requisitos negócio:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+- Criar estrutura banco de dados:    
+- Importar um arquivo CSV de tabela de frete de Cliente(s);
+- Salvar em Banco de dados;
 
-## Security Vulnerabilities
+Requisitos Técnicos:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+- controle de versionamento (GIT)
+- PHP 7/8;
+- Utilizar Composer para libs externas;
+- Utilize o framework que se sentir confortável (ou não utilize);
 
-## License
+O que se espera: 
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- Utilização de PSR (https://www.php-fig.org/psr/ PSR-1 e PSR-12)
+- Desenvolvimento da Lógica para leitura do CSV;
+- Validação e cleanup dos dados;
+- Estruturação da tabela;
+- Salvar dados DB;
+- Escrever um README com passo a passo para reproduzir o teste;
+
+Diferenciais:
+
+- Clean code;
+- Docker;
+- TDD;
+- Faker/Mockery;
+
+Como entregar:
+Responda o email do teste com o link do repositório;
+```
+

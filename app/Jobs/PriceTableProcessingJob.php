@@ -2,9 +2,8 @@
 
 namespace App\Jobs;
 
-use Exception;
+use App\Models\PriceUpload;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -16,14 +15,16 @@ class PriceTableProcessingJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
     public $timeout = 600;
+    private $uuid;
     private $fileName;
     /**
      * Create a new job instance.
      *
      * @return void
      */
-    public function __construct(string $fileName)
+    public function __construct(string $uuid, string $fileName)
     {
+        $this->uuid = $uuid;
         $this->fileName = $fileName;
     }
 
@@ -34,6 +35,10 @@ class PriceTableProcessingJob implements ShouldQueue
      */
     public function handle()
     {
+        $upload = PriceUpload::findOrFail($this->uuid);
+        $upload->status = 'processing';
+        $upload->save();
+
         $content = fopen(Storage::path($this->fileName), 'r');
         $header = true;
         $prices = [];
@@ -44,9 +49,9 @@ class PriceTableProcessingJob implements ShouldQueue
                 $header = false;
                 continue;
             }
-            $price =  $this->processLine($line);
+            $price =  $this->processLine($line, $upload->client_id);
             if (!is_null($price)) {
-                $prices[] = $this->processLine($line);
+                $prices[] = $price;
             }
             if (sizeof($prices) >= 1000) {
                 $this->savePrices($prices);
@@ -55,6 +60,15 @@ class PriceTableProcessingJob implements ShouldQueue
         }
         fclose($content);
         $this->savePrices($prices);
+        $upload->status = 'done';
+        $upload->save();
+    }
+
+    public function failed() {
+        $upload = PriceUpload::findOrFail($this->uuid);
+        $upload->status = 'fail';
+        $upload->save();
+
     }
 
     public function savePrices(array $prices)
@@ -72,13 +86,12 @@ class PriceTableProcessingJob implements ShouldQueue
         );
     }
 
-    public function processLine(string $line)
+    public function processLine(string $line, int $client_id)
     {
         $fields = explode(';', $line);
         if (sizeof($fields) < 5) {
             return null;
         }
-        $client_id = 1;
         $from_postcode = $fields[0];
         $to_postcode = $fields[1];
         $from_weight = $this->toDecimal($fields[2]);
